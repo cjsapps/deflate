@@ -3,6 +3,7 @@
   "short_name": "Deflate",
   "description": "Professional On-Device Video Compression Utility",
   "start_url": ".",
+  "main" : "index.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0f172a",
