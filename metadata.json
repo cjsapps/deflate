@@ -1,6 +1,6 @@
 {
-  "name": "OptiStream Pro",
-  "short_name": "OptiStream",
+  "name": "Deflate",
+  "short_name": "Deflate",
   "description": "Professional On-Device Video Compression Utility",
   "start_url": ".",
   "display": "standalone",
