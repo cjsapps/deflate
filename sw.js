@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'optistream-v1';
+const CACHE_NAME = 'deflate-v1';
 const ASSETS = [
   '/',
   '/index.html',
