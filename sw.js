@@ -4,6 +4,7 @@ const ASSETS = [
   '/',
   '/index.html',
   '/index.tsx',
+  '/deflate.webp',
   'https://cdn.tailwindcss.com',
   'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
   'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm'
