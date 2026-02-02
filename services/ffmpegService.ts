@@ -26,32 +26,61 @@ export const loadFFmpeg = async (onLog?: (message: string) => void) => {
   
   ffmpeg.on('log', ({ message }) => {
     if (onLog) onLog(message);
-    console.log('[FFmpeg]', message);
+    console.debug('[FFmpeg]', message);
   });
 
   const coreBaseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
   
   try {
-    // Attempt standard load
-    // If this fails (e.g. cross-origin worker restriction), the error is caught by App.tsx
     await ffmpeg.load({
       coreURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, 'text/javascript'),
       wasmURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-      // Only include workerURL if we think multi-threading will work
       ...(isMultiThreaded ? {
         workerURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.worker.js`, 'text/javascript')
       } : {})
     });
   } catch (error) {
     console.warn('FFmpeg Load Failed:', error);
-    // Rethrow so App UI can handle the state
     throw error;
   }
 
   return ffmpeg;
 };
 
-export const getIsMultiThreaded = () => isMultiThreaded;
+export const getVideoMetadata = async (file: File): Promise<{ fps?: number; width?: number; height?: number }> => {
+  const instance = await loadFFmpeg();
+  const inputName = `probe_${Date.now()}`;
+  await instance.writeFile(inputName, await fetchFile(file));
+
+  let fps: number | undefined;
+  let width: number | undefined;
+  let height: number | undefined;
+
+  const logHandler = ({ message }: { message: string }) => {
+    // Look for patterns like "Stream #0:0: Video: ..., 1920x1080 ..., 30 fps, 30 tbr, ..."
+    const fpsMatch = message.match(/(\d+(?:\.\d+)?)\s+fps/);
+    if (fpsMatch && !fps) fps = parseFloat(fpsMatch[1]);
+
+    const dimMatch = message.match(/(\d{2,})x(\d{2,})/);
+    if (dimMatch && !width) {
+      width = parseInt(dimMatch[1]);
+      height = parseInt(dimMatch[2]);
+    }
+  };
+
+  instance.on('log', logHandler);
+  try {
+    // Just run a command that triggers metadata output
+    await instance.exec(['-i', inputName]);
+  } catch (e) {
+    // FFmpeg exits with error code when no output file is specified, which is fine here
+  } finally {
+    instance.off('log', logHandler);
+    await instance.deleteFile(inputName);
+  }
+
+  return { fps, width, height };
+};
 
 export const compressVideo = async (
   file: File,
@@ -82,8 +111,19 @@ export const compressVideo = async (
     args.push('-r', settings.fps.toString());
   }
 
-  if (settings.resolutionScale !== 1.0) {
-    args.push('-vf', `scale=trunc(iw*${settings.resolutionScale}/2)*2:trunc(ih*${settings.resolutionScale}/2)*2`);
+  if (settings.resolution !== 'original') {
+    const resMap: Record<string, number> = {
+      '4k': 2160,
+      '1080p': 1080,
+      '720p': 720,
+      '480p': 480,
+      '360p': 360
+    };
+    const targetHeight = resMap[settings.resolution];
+    if (targetHeight) {
+      // Use min function in FFmpeg filter to prevent upscaling
+      args.push('-vf', `scale=-2:'min(ih,${targetHeight})'`);
+    }
   }
 
   args.push('-acodec', 'aac', '-b:a', '128k', outputName);
